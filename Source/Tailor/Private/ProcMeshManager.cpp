@@ -269,12 +269,9 @@ void AProcMeshManager::ChangeProcMeshData(float _deltaTime)
 
 		int vertexCount = aa->ProcVertexBuffer.Num();
 
-		for (int i = 0; i < vertexCount-1761; i++)
-		{
-			vertices.Add(dic_originalVertices[j][i]);
-		}
-		for (int i = 0; i < 1761; i++) {
-			vertices.Add(300 * FVector(output[3 * i], output[3 * i + 1], output[3 * i + 2]));
+		for (int i = 0; i < vertexCount; i++) {
+			int fidx = faceIdx[i]-1;
+			vertices.Add(300 * FVector(output[3 * fidx], output[3 * fidx + 1], output[3 * fidx + 2]));
 		}
 
 		m_proceduralMeshComp->UpdateMeshSection(j, vertices, normals, UV0, vertexColors, tangents);
