@@ -9,10 +9,77 @@
 #include "Engine/StaticMesh.h"
 #include "StaticMeshResources.h"
 #include "UObject/ConstructorHelpers.h"
+#include "FileHelper.h"
+#include <fstream>
+#include <random>
+
+using namespace std;
+
+void AProcMeshManager::readFileToBuffer(char* filename, double** buffer, int index) {
+	ifstream file(filename, ios::in | ios::binary | ios::ate);
+	int size = file.tellg();
+	char* memblock = new char[size];
+	file.seekg(0, ios::beg);
+	file.read(memblock, size);
+	file.close();
+
+	buffer[index] = (double*)memblock;
+}
+void forward(double* weight, double* input, double* output, int numRow, int numCol) {
+	for (int row = 0; row < numRow; row++) {
+		double sum = 0.0;
+		for (int k = 0; k < numCol; k++) {
+			sum += weight[row * numCol + k] * input[k];
+		}
+		output[row] = sum;
+	}
+}
+
+void addBias(double* matrix, double* bias, int count) {
+	for (int i = 0; i < count; i++) {
+		matrix[i] += bias[i];
+	}
+}
+
+void relu(double* matrix, int count) {
+	for (int i = 0; i < count; i++) {
+		if (matrix[i] < 0) {
+			matrix[i] = 0;
+		}
+	}
+}
 
 // Sets default values
 AProcMeshManager::AProcMeshManager()
 {
+	for (int layer = 0; layer < NUM_LAYER; layer++) {
+		//FString filepath = FPaths::ProjectContentDir();
+		//filepath.Append(TEXT("layer0weights"));
+		char* weightFilename = "";
+		char* biasFilename = "";
+		switch (layer) {
+		case(0): 
+			weightFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer0weights"; 
+			biasFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer0bias";
+			break;
+		case(1): 
+			weightFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer1weights";
+			biasFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer1bias";
+			break;
+		case(2): 
+			weightFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer2weights";
+			biasFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer2bias";
+			break;
+		case(3): 
+			weightFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer3weights";
+			biasFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer3bias";
+			break;
+		}
+		readFileToBuffer(weightFilename, layerWeights, layer);
+		readFileToBuffer(biasFilename, layerBias, layer);
+	}
+
+	// 
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -131,6 +198,25 @@ void AProcMeshManager::CreateTriangle()
 /// </summary>
 void AProcMeshManager::ChangeProcMeshData(float _deltaTime)
 {
+	counter++;
+	if (counter > 1000) counter = 0;
+	double input[20752];
+	double output[20752];
+	fill_n(input, 20752, 0);
+	fill_n(output, 20752, 0);
+	for (int i = 0; i < 72;i++) {
+		input[i] = poseStart[i] + (poseEnd[i] - poseStart[i]) * ((float)counter / 1000);
+	}
+
+	for (int layer = 0; layer < NUM_LAYER; layer++) {
+		forward(layerWeights[layer], input, output, dimensions[layer + 1], dimensions[layer]);
+		addBias(output, layerBias[layer], dimensions[layer + 1]);
+		if (layer != NUM_LAYER - 1) {
+			relu(output, dimensions[layer + 1]);
+			for (int i = 0; i < dimensions[layer + 1]; i++) { input[i] = output[i]; }
+		}
+	}
+
 	timeSpent += _deltaTime;
 	float changeValue = FMath::Sin(3.14f * timeSpent);
 
@@ -158,6 +244,7 @@ void AProcMeshManager::ChangeProcMeshData(float _deltaTime)
 	}
 
 
+
 	for (int j = 0; j < m_proceduralMeshComp->GetNumSections(); j++)
 	{
 		vertices.Empty();
@@ -166,9 +253,13 @@ void AProcMeshManager::ChangeProcMeshData(float _deltaTime)
 
 		int vertexCount = aa->ProcVertexBuffer.Num();
 
-		for (int i = 0; i < vertexCount; i++)
+		UE_LOG(LogTemp, Warning, TEXT("%d"), vertexCount);
+		for (int i = 0; i < vertexCount-1761; i++)
 		{
-			vertices.Add(dic_originalVertices[j][i] * FMath::Abs(changeValue));
+			vertices.Add(dic_originalVertices[j][i]);
+		}
+		for (int i = 0; i < 1761; i++) {
+			vertices.Add(300 * FVector(output[3 * i], output[3 * i + 1], output[3 * i + 2]));
 		}
 
 		m_proceduralMeshComp->UpdateMeshSection(j, vertices, normals, UV0, vertexColors, tangents);

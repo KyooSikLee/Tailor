@@ -17,7 +17,11 @@
 	"Plugins": [
 		{
 			"Name": "ProceduralMeshComponent",
-			"Enabled": true 
+			"Enabled": true
+		},
+		{
+			"Name": "UnrealEnginePython",
+			"Enabled": false
 		}
 	]
 }
