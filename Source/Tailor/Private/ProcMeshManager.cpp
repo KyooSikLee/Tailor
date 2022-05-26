@@ -11,21 +11,50 @@
 #include "UObject/ConstructorHelpers.h"
 #include "FileHelper.h"
 #include <fstream>
-#include <random>
 
 using namespace std;
 
-void AProcMeshManager::readFileToBuffer(char* filename, double** buffer, int index) {
-	ifstream file(filename, ios::in | ios::binary | ios::ate);
-	int size = file.tellg();
-	char* memblock = new char[size];
-	file.seekg(0, ios::beg);
-	file.read(memblock, size);
-	file.close();
+void AProcMeshManager::readFileToBuffer(FString filename, int index, bool isWeight) {
+	TArray<uint8> result;
+	FFileHelper().LoadFileToArray(result, *filename);
+	UE_LOG(LogTemp, Error, TEXT("allocatedSize: %d"), result.GetAllocatedSize());
+	int number = 0;
+	if (isWeight) {
+		number = dimensions[index] * dimensions[index + 1];
+	}
+	else {
+		number = dimensions[index + 1];
+	}
+	
+	for (int i = 0; i < number ; i++) {
+		uint8 temp[8];
+		temp[0] = result[8 * i];
+		temp[1] = result[8 * i + 1];
+		temp[2] = result[8 * i + 2];
+		temp[3] = result[8 * i + 3];
+		temp[4] = result[8 * i + 4];
+		temp[5] = result[8 * i + 5];
+		temp[6] = result[8 * i + 6];
+		temp[7] = result[8 * i + 7];
+		double* doubleTemp = (double*)temp;
+		if (isWeight) {
+			layerWeights[index].Add(doubleTemp[0]);
+		}
+		else {
+			layerBias[index].Add(doubleTemp[0]);
+		}
+	}
+	//ifstream file(filename, ios::in | ios::binary | ios::ate);
+	//int size = file.tellg();
+	//UE_LOG(LogTemp, Error, TEXT("%d"), size);
+	//char* memblock = new char[size];
+	//file.seekg(0, ios::beg);
+	//file.read(memblock, size);
+	//file.close();
 
-	buffer[index] = (double*)memblock;
+	//buffer[index] = (double*)memblock;
 }
-void forward(double* weight, double* input, double* output, int numRow, int numCol) {
+void forward(TArray<double> weight, double* input, double* output, int numRow, int numCol) {
 	for (int row = 0; row < numRow; row++) {
 		double sum = 0.0;
 		for (int k = 0; k < numCol; k++) {
@@ -35,7 +64,7 @@ void forward(double* weight, double* input, double* output, int numRow, int numC
 	}
 }
 
-void addBias(double* matrix, double* bias, int count) {
+void addBias(double* matrix, TArray<double> bias, int count) {
 	for (int i = 0; i < count; i++) {
 		matrix[i] += bias[i];
 	}
@@ -53,30 +82,17 @@ void relu(double* matrix, int count) {
 AProcMeshManager::AProcMeshManager()
 {
 	for (int layer = 0; layer < NUM_LAYER; layer++) {
-		//FString filepath = FPaths::ProjectContentDir();
-		//filepath.Append(TEXT("layer0weights"));
-		char* weightFilename = "";
-		char* biasFilename = "";
-		switch (layer) {
-		case(0): 
-			weightFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer0weights"; 
-			biasFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer0bias";
-			break;
-		case(1): 
-			weightFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer1weights";
-			biasFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer1bias";
-			break;
-		case(2): 
-			weightFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer2weights";
-			biasFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer2bias";
-			break;
-		case(3): 
-			weightFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer3weights";
-			biasFilename = "../../../../../../Users/KyooSik/Documents/Unreal Projects/Tailor/Content/layer3bias";
-			break;
-		}
-		readFileToBuffer(weightFilename, layerWeights, layer);
-		readFileToBuffer(biasFilename, layerBias, layer);
+		FString weightFilepath= FPaths::ProjectContentDir().Append(TEXT("model/"));
+		FString biasFilepath = FPaths::ProjectContentDir().Append(TEXT("model/"));
+		weightFilepath.Append(TEXT("layer"));
+		biasFilepath.Append(TEXT("layer"));
+		weightFilepath.AppendInt(layer);
+		biasFilepath.AppendInt(layer);
+		weightFilepath.Append(TEXT("weights"));
+		biasFilepath.Append(TEXT("bias"));
+
+		readFileToBuffer(weightFilepath, layer, true);
+		readFileToBuffer(biasFilepath, layer, false);
 	}
 
 	// 
@@ -218,7 +234,6 @@ void AProcMeshManager::ChangeProcMeshData(float _deltaTime)
 	}
 
 	timeSpent += _deltaTime;
-	float changeValue = FMath::Sin(3.14f * timeSpent);
 
 	TArray<FVector> vertices;
 	TArray<FVector> normals;
@@ -244,6 +259,7 @@ void AProcMeshManager::ChangeProcMeshData(float _deltaTime)
 	}
 
 
+	
 
 	for (int j = 0; j < m_proceduralMeshComp->GetNumSections(); j++)
 	{
@@ -253,7 +269,6 @@ void AProcMeshManager::ChangeProcMeshData(float _deltaTime)
 
 		int vertexCount = aa->ProcVertexBuffer.Num();
 
-		UE_LOG(LogTemp, Warning, TEXT("%d"), vertexCount);
 		for (int i = 0; i < vertexCount-1761; i++)
 		{
 			vertices.Add(dic_originalVertices[j][i]);
