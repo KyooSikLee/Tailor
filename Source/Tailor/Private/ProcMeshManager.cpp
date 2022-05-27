@@ -94,6 +94,8 @@ AProcMeshManager::AProcMeshManager()
 		readFileToBuffer(weightFilepath, layer, true);
 		readFileToBuffer(biasFilepath, layer, false);
 	}
+	UE_LOG(LogTemp, Error, TEXT("%f"), layerWeights[0][0]);
+	UE_LOG(LogTemp, Error, TEXT("%f"), layerWeights[0][25000]);
 
 	// 
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
