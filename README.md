@@ -5,7 +5,7 @@
 - [X] cull 없애기 -> double sided material로 해결
 - [ ] 옷과 캐릭터 맞추기
 - [ ] 캐릭터 Maya 이용해서 뼈 붙이고 애니메이션 하기. mixamo?
-- [ ] vertex 바꾼 후에 normal 다시 계산하기
+- [ ] vertex 바꾼 후에 normal 다시 계산하기 -> 일단은 obj import 할때 x축 rotate 안하니까 괜찮게 보였음
 
 ## Mid Priority
 
