@@ -11,6 +11,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Misc/FileHelper.h"
 #include <fstream>
+#include "Async/ParallelFor.h"
 
 using namespace std;
 
@@ -55,27 +56,43 @@ void AProcMeshManager::readFileToBuffer(FString filename, int index, bool isWeig
 	//buffer[index] = (double*)memblock;
 }
 void forward(TArray<double> weight, double* input, double* output, int numRow, int numCol) {
-	for (int row = 0; row < numRow; row++) {
+	ParallelFor(numRow, [&](int32 row) {
 		double sum = 0.0;
 		for (int k = 0; k < numCol; k++) {
 			sum += weight[row * numCol + k] * input[k];
 		}
 		output[row] = sum;
-	}
+		}
+	);
+	//for (int row = 0; row < numRow; row++) {
+	//	double sum = 0.0;
+	//	for (int k = 0; k < numCol; k++) {
+	//		sum += weight[row * numCol + k] * input[k];
+	//	}
+	//	output[row] = sum;
+	//}
 }
 
 void addBias(double* matrix, TArray<double> bias, int count) {
-	for (int i = 0; i < count; i++) {
+	ParallelFor(count, [&](int32 i) {
 		matrix[i] += bias[i];
-	}
+		});
+	//for (int i = 0; i < count; i++) {
+	//	matrix[i] += bias[i];
+	//}
 }
 
 void relu(double* matrix, int count) {
-	for (int i = 0; i < count; i++) {
+	ParallelFor(count, [&](int32 i) {
 		if (matrix[i] < 0) {
 			matrix[i] = 0;
 		}
-	}
+	});
+	//for (int i = 0; i < count; i++) {
+	//	if (matrix[i] < 0) {
+	//		matrix[i] = 0;
+	//	}
+	//}
 }
 
 // Sets default values
@@ -217,13 +234,19 @@ void AProcMeshManager::CreateTriangle()
 void AProcMeshManager::ChangeProcMeshData(float _deltaTime)
 {
 	counter++;
-	if (counter > 1000) counter = 0;
+	int FRAME_SIZE = 32;
+	if (counter > (1000 / FRAME_SIZE) * FRAME_SIZE) counter = 0;
+	
 	double input[20752];
 	double output[20752];
 	fill_n(input, 20752, 0);
 	fill_n(output, 20752, 0);
-	for (int i = 0; i < 72;i++) {
-		input[i] = poseStart[i] + (poseEnd[i] - poseStart[i]) * ((float)counter / 1000);
+	int N_INTERPOLATION = 10;
+	UpdateBodyMeshbyIndex((counter/2) % FRAME_SIZE);
+
+	for (int i=0; i<FRAME_SIZE; i++) {
+		input[i] = rumbaPoses[(counter/2) % FRAME_SIZE][i];
+		//input[i] = poseStart[i] + (poseEnd[i] - poseStart[i]) * ((float)counter / 1000);
 	}
 
 	for (int layer = 0; layer < NUM_LAYER; layer++) {
@@ -275,7 +298,7 @@ void AProcMeshManager::ChangeProcMeshData(float _deltaTime)
 
 		for (int i = 0; i < vertexCount; i++) {
 			int fidx = faceIdx[i] - 1;
-			vertices.Add(300 * FVector(output[3 * fidx], output[3 * fidx + 1], output[3 * fidx + 2]));
+			vertices.Add(120 * FVector(output[3 * fidx], output[3 * fidx + 1], output[3 * fidx + 2]));
 		}
 
 		m_proceduralMeshComp->UpdateMeshSection(j, vertices, normals, UV0, vertexColors, tangents);
